@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>TourHam App</title>
+  <style>
+    p {
+      font-size: 24px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+    integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cuprum&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <div class="container" id="title">
+    <h1>Tour Hamilton App</h1>
+  </div>
+  <div class="container">
+    <div id="myMap" style="width:700px;height:700px;float:left;"></div>
+    <div style="width:400px;float:left;padding: 0px 0px 0px 20px;">
+      <button class="btn btn-primary btn-lg" id="start">Start</button>
+      <div class="snippet">
+        <p><strong>Tour Bot:</strong> <span id="output"></span></p>
+
+        <div class="" data-title=".dot-elastic" id="dots" style="display: none;">
+          <div class="stage">
+            <div class="dot-elastic"></div>
+          </div>
+        </div>
+      </div>
+      <div class="jumbotron">
+        <p><strong>Script:</strong> Try saying the below in sequence... <br /> <br />
+        <ol>
+          <li>Options</li>
+          <li>Find Waterfalls</li>
+          <li>Clear Map</li>
+          <li>Find local art</li>
+          <li>Clear Map</li>
+          <li>McMaster University</li>
+          <li>Tell me about McMaster University</li>
+          <li>Goodbye!</li>
+        </ol>
+        </p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Load in the annyang library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/annyang/2.6.0/annyang.min.js"></script>
+
+  <!-- 
+    Load in fire station data obtained from this data set:
+    https://open.hamilton.ca/datasets/dbb028cd6bcc4b218c607952b760fd04_5
+
+    This JavaScript (JSON) data was obtained by clicking on APIs -> GeoJSON,
+    copying the URL into the browser and hitting enter, I downloaded the 
+    file, saved it as firestations.js, and added "var firestations = " at 
+    the top so I can access the object with that variable name in this script.
+  -->
+  <script src="firestations.js"></script>
+
+  <!--- The library location data was obtained in the same way... -->
+  <script src="libraries.js"></script>
+  <script src="waterfalls.js"></script>
+  <script src="tourisms.js"></script>
+  <script src="museums.js"></script>
+  <script src="arts.js"></script>
+  <script>
+    function transcript(s) {
+      document.getElementById("output").innerHTML =
+        "\"" + s + "  \" ";
+    }
+    // Welcome the user after they click the start button
+    document.getElementById("start").onclick = function () {
+      document.getElementById("dots").style.display = "block";
+      document.getElementById("start").innerHTML = "Listening...";
+      var synth = window.speechSynthesis;
+      var utterText = "Welcome to Hamilton! Please say the name of the place you would like to visit or say Options to hear some of my suggestions!";
+      var utterThis = new SpeechSynthesisUtterance(utterText);
+      utterThis.pitch = 1.5;
+      utterThis.rate = 1.2;
+      synth.speak(utterThis);
+      // Start listening. You can call this here, or attach this call to an event, button, etc.
+      annyang.start({ autoRestart: true, continuous: true });
+      transcript("Welcome to Hamilton! Please say the name of the location you would like to go or say Options to hear some of my suggestions!");
+    }
+
+    function replyBack(s) {
+      var synth = window.speechSynthesis;
+      var utterText = s;
+      var utterThis = new SpeechSynthesisUtterance(utterText);
+      utterThis.pitch = 1.5;
+      utterThis.rate = 1.2;
+      synth.speak(utterThis);
+      transcript(s);
+    }
+
+    function foundThis() {
+      var synth = window.speechSynthesis;
+      var utterText = "Here's what I found";
+      var utterThis = new SpeechSynthesisUtterance(utterText);
+      utterThis.pitch = 1.5;
+      utterThis.rate = 1.2;
+      synth.speak(utterThis);
+      transcript("Here's what I found");
+    }
+
+    function errorSpeech() {
+      var synth = window.speechSynthesis;
+      var utterText = "I'm not sure what you mean. Can you repeat that?";
+      var utterThis = new SpeechSynthesisUtterance(utterText);
+      utterThis.pitch = 1.5;
+      utterThis.rate = 1.2;
+      synth.speak(utterThis);
+      transcript("I'm not sure what you mean. Can you repeat that?")
+    }
+
+    function getRandomInt(max) {
+      return Math.floor(Math.random() * Math.floor(max));
+    }
+
+
+
+    if (annyang) {
+
+      // Commands are defined as keys and values in an object, the key is the 
+      // text for the command, and the value is callback function (i.e. event 
+      // handler) to call for the command
+      var commands = {
+
+        // If "information about X" is uttered, we show on the page "Here is some
+        // information about X".  
+        "information about *place":
+          function (place) {
+            document.getElementById("output").innerHTML =
+              "Here is some information about " + place;
+            replyBack("Here is some information about " + place);
+          },
+
+        "Options":
+          function (option) {
+            replyBack("Here are some places you could go! Would you like a suggestion?");
+            for (i = 0; i < tourisms.features.length; i++) {
+              // add a pushpin to the map for each library
+              map.entities.push(
+                new Microsoft.Maps.Pushpin(
+                  new Microsoft.Maps.Location(
+                    // use the latitude & longitude data for the pushpin position
+                    tourisms.features[i].properties.LATITUDE,
+                    tourisms.features[i].properties.LONGITUDE
+                  ),
+                  // use the library name for the label 
+                  { title: tourisms.features[i].properties.NAME }
+                ));
+            }
+          },
+
+        "yes":
+          function (option) {
+            for (i = map.entities.getLength() - 1; i >= 0; i--) {
+              var pushpin = map.entities.get(i);
+              if (pushpin instanceof Microsoft.Maps.Pushpin) {
+                map.entities.removeAt(i);
+              }
+            }
+            var x = getRandomInt(tourisms.features.length - 10);
+
+            // add a pushpin to the map for each library
+            map.entities.push(
+              new Microsoft.Maps.Pushpin(
+                new Microsoft.Maps.Location(
+                  // use the latitude & longitude data for the pushpin position
+                  tourisms.features[x].properties.LATITUDE,
+                  tourisms.features[x].properties.LONGITUDE
+                ),
+                // use the library name for the label 
+                { title: tourisms.features[x].properties.TITLE }
+              ));
+            replyBack("I suggest the " + tourisms.features[x].properties.TITLE);
+            replyBack("Would you like another suggestion?");
+
+          },
+        "no":
+          function (option) {
+            replyBack("No problem! Anything else I can help you with?");
+
+          },
+
+        // If "show firestations" or "show libraries" are uttered, the map will 
+        // be populated with pushpins for firestations or libraries
+        //
+        // We use the firestations.js and libraries.js data above to do so, note 
+        // that we know how to access the data structure be examining the data 
+        // structure... so we can see for example that firestations.features 
+        // contains an array of objects with firestation data, and we can see 
+        // that firestations.features[i].properties contains latitude, longitude
+        // and name data.  
+        //
+        // You could use a tool like this to help you visualize the data:
+        //    http://jsonviewer.stack.hu/
+        //
+        "Find *type":
+          function (type) {
+            // if type includes "fire" we assume the user wants to see firestations
+            if (type.includes("fire")) {
+              // loop through the array of firestations in the firestations.js data
+              for (i = 0; i < firestations.features.length; i++) {
+                // add a pushpin to the map for each firestation
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      firestations.features[i].properties.LATITUDE,
+                      firestations.features[i].properties.LONGITUDE
+                    ),
+                    // use the firestation name for the label 
+                    { title: firestations.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            // if type includes "libraries" we assume user wants to see libraries
+            else if (type.includes("libraries")) {
+              // loop through the array of libraries in the libraries.js data
+              for (i = 0; i < libraries.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      libraries.features[i].properties.LATITUDE,
+                      libraries.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: libraries.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else if (type.includes("waterfall")) {
+              for (i = 0; i < waterfalls.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      waterfalls.features[i].properties.LATITUDE,
+                      waterfalls.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: waterfalls.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else if (type.includes("local art")) {
+              for (i = 0; i < arts.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      arts.features[i].properties.LATITUDE,
+                      arts.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: arts.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else if (type.includes("art")) {
+              for (i = 0; i < arts.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      arts.features[i].properties.LATITUDE,
+                      arts.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: arts.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else if (type.includes("museum")) {
+              for (i = 0; i < museums.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      museums.features[i].properties.LATITUDE,
+                      museums.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: museums.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else if (type.includes("tourism")) {
+              for (i = 0; i < tourisms.features.length; i++) {
+                // add a pushpin to the map for each library
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    new Microsoft.Maps.Location(
+                      // use the latitude & longitude data for the pushpin position
+                      tourisms.features[i].properties.LATITUDE,
+                      tourisms.features[i].properties.LONGITUDE
+                    ),
+                    // use the library name for the label 
+                    { title: tourisms.features[i].properties.NAME }
+                  ));
+              }
+              foundThis();
+            }
+            else {
+              errorSpeech();
+            }
+          },
+
+        // If "clear map" is uttered all pushpins are removed from the map
+        "clear map":
+          function () {
+            // Code to remove all pushpins is taken directly from the API docs:
+            // https://www.bing.com/api/maps/sdkrelease/mapcontrol/isdk/deletepushpins
+            for (i = map.entities.getLength() - 1; i >= 0; i--) {
+              var pushpin = map.entities.get(i);
+              if (pushpin instanceof Microsoft.Maps.Pushpin) {
+                map.entities.removeAt(i);
+              }
+            }
+            replyBack("Map cleared!");
+          },
+        "tell me about *mac":
+          function (mac) {
+
+            replyBack("McMaster University is a public research university with an excellent human computer interfaces class!");
+          },
+        "goodbye":
+          function (mac) {
+            document.getElementById("start").innerHTML = "Start";
+            replyBack("Goodbye!");
+            annyang.abort();
+            transcript("Press start to begin searching again!");
+            document.getElementById("dots").style.display = "none";
+          },
+        "cancel":
+          function (mac) {
+            document.getElementById("start").innerHTML = "Start";
+            annyang.abort();
+            transcript("Press start to begin searching again!");
+            document.getElementById("dots").style.display = "none";
+          },
+
+        // Any other utterance will be caught by this case, and we use the 
+        // Bing Maps geolocation service to find a latitude and longitude 
+        // position based on the utterance:
+        //  https://www.bing.com/api/maps/sdkrelease/mapcontrol/isdk/searchbyaddress#JS
+        // We then place a pushpin on the map at that location.
+        //
+        // So if we say "Dundas, Ontario" or "Toronto, Ontario" it will 
+        // attempt to find the location and put a pushpin on the map there
+        "*catchall":
+          function (catchall) {
+            var requestOptions = {
+              bounds: map.getBounds(),
+              where: catchall,
+              callback: function (answer, userData) {
+                map.setView({ bounds: answer.results[0].bestView });
+                map.entities.push(
+                  new Microsoft.Maps.Pushpin(
+                    answer.results[0].location,
+                    { title: catchall }
+                  )
+                );
+              }
+            };
+            searchManager.geocode(requestOptions);
+            replyBack("Here's what I found for " + catchall);
+          }
+
+      };
+
+      // Add our commands to annyang
+      annyang.addCommands(commands);
+
+    }
+
+
+    // Loads the map, called after Bing map library finishes loading
+    function loadmap() {
+      // Create a map centered on Hamilton, Ontario
+      map = new Microsoft.Maps.Map(document.getElementById("myMap"),
+        {
+          center: new Microsoft.Maps.Location(43.2557, -79.8711),
+          // we could set additional options when we create the map...
+          // mapTypeId: Microsoft.Maps.MapTypeId.aerial,
+          // zoom: 12        
+        });
+
+      // Load the search manager that allows us to search for locations 
+      // (lat and long positions) based on an address, e.g. Toronto, Ontario
+      Microsoft.Maps.loadModule('Microsoft.Maps.Search', function () {
+        searchManager = new Microsoft.Maps.Search.SearchManager(map);
+      });
+    }
+  </script>
+  <script
+    src="https://www.bing.com/api/maps/mapcontrol?key=Ao9pr871PkWBHGRHO0L9f_kuQRMt5jgnmM-oQ8i0e6Ll-8DNNEgrcbiHr_wjaKq4&callback=loadmap"
+    async defer></script>
+
+</body>
+
+</html>
